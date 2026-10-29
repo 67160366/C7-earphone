@@ -1,5 +1,21 @@
 # ส่งงานให้เพื่อนโดยรักษางานเดิม
 
+## ช่องทางส่งงานที่ใช้จริง
+
+บัญชีที่เชื่อมอยู่ไม่มีสิทธิ์เขียน repo ของเพื่อน จึงใช้ fork `67160366/C7-earphone` และ branch `codex/hardware-demo-handoff` แทน ไม่เปลี่ยน origin/main ของเพื่อน และไม่ merge อัตโนมัติ
+
+- [เปิด source/README ของ branch ส่งต่อ](https://github.com/67160366/C7-earphone/tree/codex/hardware-demo-handoff)
+- [หน้าเริ่มอ่านสำหรับเพื่อน](https://github.com/67160366/C7-earphone/blob/codex/hardware-demo-handoff/docs/README.md)
+- [เปรียบเทียบงานกับ repo เดิม](https://github.com/67160162-BUU/C7-earphone/compare/main...67160366:codex/hardware-demo-handoff)
+
+เพื่อนอ่านจาก fork ได้เลย ไม่ต้องให้สิทธิ์เขียนเพิ่มและไม่ต้อง merge ถ้าต้องการรันโดยไม่แตะโฟลเดอร์เก่า:
+
+```powershell
+git clone --branch codex/hardware-demo-handoff --single-branch https://github.com/67160366/C7-earphone.git C7-earphone-hardware-demo
+```
+
+ส่วนด้านล่างเป็นทางเลือกทั่วไปเมื่อมีสิทธิ์เขียน repo ต้นทาง หรือเมื่อส่งงานเพิ่มเติม
+
 ## การเตรียมในเครื่องนี้
 
 - Remote `origin`: https://github.com/67160162-BUU/C7-earphone.git
@@ -42,7 +58,7 @@ git push -u origin codex/hardware-demo-handoff
 
 นี่เป็นการสร้าง/อัปเดต branch งานบน GitHub ไม่เปลี่ยนไฟล์ใน `main` ของเพื่อน เปิด Pull Request โดยเลือก base=`main`, compare=`codex/hardware-demo-handoff` แล้วให้เพื่อนอ่าน Files changed ก่อนตัดสินใจ merge **การ merge ต่างหากที่จะนำโค้ดเข้า main** ไม่ต้อง merge เพื่อเปิดอ่านเอกสารใน branch
 
-หลัง push จึงใช้ลิงก์นี้ได้:
+ลิงก์ส่วนนี้ใช้ได้เฉพาะกรณีได้สิทธิ์และ push branch เข้า repo ต้นทางในอนาคต สำหรับงานที่ส่งด้วย fork ให้ใช้ลิงก์ด้านบน:
 
 - [branch งาน](https://github.com/67160162-BUU/C7-earphone/tree/codex/hardware-demo-handoff)
 - [หน้าเริ่มอ่านสำหรับเพื่อน](https://github.com/67160162-BUU/C7-earphone/blob/codex/hardware-demo-handoff/docs/README.md)
@@ -63,10 +79,10 @@ git push -u myfork codex/hardware-demo-handoff
 
 ## เพื่อนอยากรันโดยไม่ยุ่ง checkout เดิม
 
-วิธีง่ายคือ clone branch ลงโฟลเดอร์ใหม่ หลังจาก branch ถูก push แล้ว:
+วิธีง่ายคือ clone branch ลงโฟลเดอร์ใหม่ หลังจาก branch ถูก push แล้ว ใช้ fork ที่ส่งงานจริง:
 
 ```powershell
-git clone --branch codex/hardware-demo-handoff --single-branch https://github.com/67160162-BUU/C7-earphone.git C7-earphone-hardware-demo
+git clone --branch codex/hardware-demo-handoff --single-branch https://github.com/67160366/C7-earphone.git C7-earphone-hardware-demo
 cd C7-earphone-hardware-demo
 ```
 

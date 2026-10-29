@@ -12,6 +12,7 @@ Implementation map: docs/ARCHITECTURE.md
 Current state, verification and remaining work: HANDOFF.md
 Documentation entry point: docs/README.md
 Handoff branch: codex/hardware-demo-handoff (separate from main)
+Sharing fork: https://github.com/67160366/C7-earphone
 
 Bootstrap:
   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup.ps1

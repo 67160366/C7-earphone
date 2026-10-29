@@ -14,6 +14,7 @@
 
 - Workspace: D:/work/HeadSet
 - Origin: https://github.com/67160162-BUU/C7-earphone.git
+- Fork สำหรับส่งงาน: https://github.com/67160366/C7-earphone — origin เดิมไม่มีสิทธิ์เขียนสำหรับบัญชีที่เชื่อมอยู่ จึงใช้ fork และ branch แยกแทน
 - Baseline: ad2cbc280a54768f9d588ac6fe5351a70fa81073
 - Branch ส่งต่อในเครื่อง: codex/hardware-demo-handoff
 - งานส่งต่อใช้ branch นี้แยกจาก main ไม่มีการ merge หรือ push ตรงเข้า main; ตรวจ commit และ remote ล่าสุดด้วย git log / git status
