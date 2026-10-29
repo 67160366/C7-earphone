@@ -1,0 +1,30 @@
+# C7-BioSync project initialization
+
+Repository: https://github.com/67160162-BUU/C7-earphone
+Upstream branch: main
+Upstream commit: ad2cbc280a54768f9d588ac6fe5351a70fa81073
+Workspace: D:\work\HeadSet
+
+This file is a human-readable initialization record, not an executable.
+Agent instructions: AGENTS.md
+Project overview and commands: README.md
+Implementation map: docs/ARCHITECTURE.md
+Current state, verification and remaining work: HANDOFF.md
+Documentation entry point: docs/README.md
+Handoff branch: codex/hardware-demo-handoff (separate from main)
+
+Bootstrap:
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup.ps1
+Run:
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts/serve.ps1 -Background
+Check:
+  node scripts/check.mjs
+Stop:
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts/serve.ps1 -Stop
+
+Default URL: http://127.0.0.1:8080/
+Default storage: .local/data (ignored by Git)
+Local config: .env (ignored by Git); template: .env.example
+Required: PHP 8+ with JSON and PDO; Node.js 18+ for checks only.
+No Composer, npm install, frontend build or external web assets are needed.
+MySQL and ESP32 hardware are optional for the browser simulation.

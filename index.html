@@ -2,6 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
+    <script src="assets/c7-device.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>C7-BioSync | 3D Biomechanical Simulator & Investor Pitch Deck (100% Offline Ready)</title>
     <!-- Inline SVG Favicon to prevent favicon.ico 404 error -->
@@ -865,7 +866,7 @@
                                 <span>มุมก้ม/เงยศีรษะ (Head Pitch / θ_Head)</span>
                                 <span class="control-val" id="val-pitch">+0.0°</span>
                             </div>
-                            <input type="range" id="slider-pitch" min="-25" max="40" step="0.5" value="0" oninput="onManualSlider()">
+                            <input type="range" id="slider-pitch" min="-25" max="45" step="0.5" value="0" oninput="onManualSlider()">
                         </div>
 
                         <div class="control-group">
@@ -873,7 +874,7 @@
                                 <span>มุมเอียงคอซ้าย/ขวา (Head Roll / ϕ)</span>
                                 <span class="control-val" id="val-roll">+0.0°</span>
                             </div>
-                            <input type="range" id="slider-roll" min="-25" max="25" step="0.5" value="0" oninput="onManualSlider()">
+                            <input type="range" id="slider-roll" min="-30" max="30" step="0.5" value="0" oninput="onManualSlider()">
                         </div>
 
                         <div class="control-group">
@@ -956,6 +957,7 @@
                             <button class="btn-cam" id="btn-usb-slide" style="flex: 1.5; font-size: 0.64rem; padding: 5px 5px; color: #e9d5ff; border-color: rgba(192,132,252,0.6); background: rgba(192,132,252,0.14); font-weight: 700;" onclick="connectUsbSerialFromSlide()">
                                 🔌 เชื่อมสาย USB (ESP32)
                             </button>
+                            <button class="btn-cam" onclick="zeroSlideDevice()" style="font-size:0.62rem">🎯 Zero ESP32</button>
                             <button class="btn-cam" id="btn-live-db" style="flex: 1.1; font-size: 0.63rem; padding: 5px 5px; border-color: var(--cyan);" onclick="toggleLiveDbMode()">
                                 📡 รับจาก DB: ปิด
                             </button>
@@ -1120,7 +1122,7 @@
                     <!-- Haptic Biofeedback Timer -->
                     <div class="haptic-alert-box" id="hapticBox">
                         <div>
-                            <div style="font-weight: 700;" id="hapticTitle">มอเตอร์สั่นเตือนที่ C7: สแตนด์บาย</div>
+                            <div style="font-weight: 700;" id="hapticTitle">SIMULATION: มอเตอร์สั่นสแตนด์บาย</div>
                             <div style="font-size: 0.64rem; color: var(--text-muted);" id="hapticSub">สั่นเตือนเมื่อออกห่างจุด Origin (CVA &lt; 48°) เกิน 5 วินาที</div>
                         </div>
                         <div style="font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700;" id="hapticTimer">0.0s</div>
@@ -1770,7 +1772,7 @@
             // Angle between horizontal forward line (+Z) through C7 Spinous Process and the line from C7 Spinous Process to Ear Tragus
             const dz = midEarPos.z - c7Pos.z;
             const dy = midEarPos.y - c7Pos.y;
-            const cvaDeg = Math.atan2(dy, Math.max(0.15, dz)) * RAD2DEG;
+            const cvaDeg = C7Device.calculateCVA(c7Deg, pitchDeg, rollDeg, yawDeg);
 
             return {
                 c7Pos,
@@ -2159,8 +2161,8 @@
             );
 
             // 4. Compute Active & Drifted Kinematics
-            const jawJitter = simState.jawNoiseTimer > 0 ? Math.sin(now * 0.045) * 9.5 : 0;
-            const effectiveDrift = simState.driftCompensationEnabled ? (simState.injectedDriftDeg * 0.015) : simState.injectedDriftDeg;
+            const jawJitter = !slideDeviceMode && !isLiveDbActive && simState.jawNoiseTimer > 0 ? Math.sin(now * 0.045) * 9.5 : 0;
+            const effectiveDrift = (slideDeviceMode || isLiveDbActive) ? 0 : simState.driftCompensationEnabled ? (simState.injectedDriftDeg * 0.015) : simState.injectedDriftDeg;
 
             const measuredKin = computeKinematics(
                 simState.c7Flexion + effectiveDrift * 0.85,
@@ -2309,6 +2311,19 @@
         }
 
         function updateTelemetryPanel(dt, now, measuredKin, originKin, rawDriftedKin) {
+            if (slideDeviceMode && !slideDeviceValid) {
+                document.getElementById('readout-cva').textContent = '--';
+                document.getElementById('readout-badge').textContent = 'NO VALID SENSOR DATA';
+                document.getElementById('readout-badge').style.color = 'var(--amber)';
+                document.getElementById('insight-banner').textContent = slideDeviceMessage;
+                document.getElementById('readout-aht').textContent = '--';
+                document.getElementById('readout-load').textContent = '--';
+                simState.fhpSustainedSec = 0;
+                document.getElementById('hapticTitle').textContent = 'SIMULATION: รอข้อมูลที่ใช้ได้';
+                document.getElementById('hapticTimer').textContent = '--';
+                document.getElementById('hapticBox').classList.remove('danger');
+                return;
+            }
             const cva = measuredKin.cvaDeg;
             // Euclidean distance (cm) of Mid-Tragus from Origin Reference Location
             const distFromOriginCm = measuredKin.midEarPos.sub(originKin.midEarPos).length() * 10.0;
@@ -2330,7 +2345,7 @@
             document.getElementById('origin-coords').textContent =
                 `Ear0=(${(originKin.midEarPos.x*10).toFixed(1)}, +${(originKin.midEarPos.y*10).toFixed(1)}, +${(originKin.midEarPos.z*10).toFixed(1)})cm | C7=(0,0,0)`;
 
-            const residualDrift = simState.driftCompensationEnabled ? (simState.injectedDriftDeg * 0.015) : simState.injectedDriftDeg;
+            const residualDrift = (slideDeviceMode || isLiveDbActive) ? 0 : simState.driftCompensationEnabled ? (simState.injectedDriftDeg * 0.015) : simState.injectedDriftDeg;
             const driftLabel = document.getElementById('drift-mode-label');
             const driftCompText = document.getElementById('drift-comparison');
 
@@ -2413,11 +2428,11 @@
 
             if (simState.fhpSustainedSec >= 5.0) {
                 hapticBox.classList.add('danger');
-                hapticTitle.textContent = '📳 HAPTIC MOTOR ACTIVE! (สั่นเตือนให้กลับสู่จุด Origin)';
+                hapticTitle.textContent = '📳 SIMULATION: ถึงเกณฑ์สั่นเตือน (ยังไม่สั่งมอเตอร์จริง)';
                 hapticTitle.style.color = 'var(--crimson)';
             } else {
                 hapticBox.classList.remove('danger');
-                hapticTitle.textContent = isPoorPosture ? '⏳ กำลังจับเวลาออกนอกโซน Origin...' : 'มอเตอร์สั่นเตือนที่ C7: สแตนด์บาย';
+                hapticTitle.textContent = isPoorPosture ? 'SIMULATION: กำลังจับเวลานอกโซน Origin...' : 'SIMULATION: มอเตอร์สั่นสแตนด์บาย';
                 hapticTitle.style.color = isPoorPosture ? 'var(--amber)' : 'var(--emerald)';
             }
         }
@@ -2437,12 +2452,15 @@
             simState.originHeadYaw = 0.0;
             simState.originCVA = grp.cva;
 
-            // Move current posture to the selected group's Fixed Origin baseline
+            // Cohort selection changes the reference, never a live sensor measurement.
+            if (!slideDeviceMode && !isLiveDbActive) {
             simState.targetC7 = grp.c7Flexion;
             simState.targetPitch = 0.0;
             simState.targetRoll = 0.0;
             simState.targetYaw = 0.0;
             syncSlidersFromTarget();
+
+            }
 
             // Update UI buttons and summary
             ['normal', 'fhp', 'all'].forEach(k => {
@@ -2460,6 +2478,7 @@
         }
 
         function onDriftSlider() {
+            if (slideConnection.connected || isLiveDbActive) return;
             simState.targetDriftDeg = parseFloat(document.getElementById('slider-drift').value);
             document.getElementById('val-drift').textContent = '+' + simState.targetDriftDeg.toFixed(1) + '°';
         }
@@ -2475,6 +2494,7 @@
         }
 
         function injectDemoDriftScenario() {
+            if (slideConnection.connected || isLiveDbActive) return;
             simState.targetDriftDeg = 9.5;
             document.getElementById('slider-drift').value = 9.5;
             document.getElementById('val-drift').textContent = '+9.5°';
@@ -2493,6 +2513,9 @@
         }
 
         function onManualSlider() {
+            if (slideConnection.connected) return;
+            slideDeviceMode = false;
+            document.getElementById('simCanvas').style.opacity = '1';
             simState.targetC7 = parseFloat(document.getElementById('slider-c7').value);
             simState.targetPitch = parseFloat(document.getElementById('slider-pitch').value);
             simState.targetRoll = parseFloat(document.getElementById('slider-roll').value);
@@ -2502,6 +2525,9 @@
         }
 
         function applyPreset(name) {
+            if (slideConnection.connected) return;
+            slideDeviceMode = false;
+            document.getElementById('simCanvas').style.opacity = '1';
             document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
             const btn = document.getElementById('preset-' + name);
             if (btn) btn.classList.add('active');
@@ -2569,6 +2595,10 @@
         let isLiveDbActive = false;
 
         function toggleLiveDbMode() {
+            if (slideConnection.connected) return;
+            slideDeviceMode = false;
+            document.getElementById('simCanvas').style.opacity = '1';
+            ++slidePollGeneration;
             isLiveDbActive = !isLiveDbActive;
             const btn = document.getElementById('btn-live-db');
             const pill = document.getElementById('db-live-pill');
@@ -2596,10 +2626,13 @@
 
         async function pollLatestFromDb() {
             const statusEl = document.getElementById('db-status-text');
+            if (!isLiveDbActive || slideConnection.connected) return;
+            const generation = slidePollGeneration;
             try {
                 const res = await fetch('api/get_latest.php?t=' + Date.now(), { cache: 'no-store' });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const json = await res.json();
+                if (!isLiveDbActive || generation !== slidePollGeneration || slideConnection.connected) return;
                 if (json && json.data) {
                     const d = json.data;
                     simState.targetC7 = parseFloat(d.c7_angle);
@@ -2613,10 +2646,12 @@
                     statusEl.style.color = 'var(--emerald)';
                 }
             } catch (err) {
+                if (!isLiveDbActive || generation !== slidePollGeneration || slideConnection.connected) return;
                 // Fallback to reading api/latest_angle.json directly if PHP server is not used
                 try {
                     const resJson = await fetch('api/latest_angle.json?t=' + Date.now(), { cache: 'no-store' });
                     const d = await resJson.json();
+                    if (!isLiveDbActive || generation !== slidePollGeneration || slideConnection.connected) return;
                     if (d && typeof d.c7_angle !== 'undefined') {
                         simState.targetC7 = parseFloat(d.c7_angle);
                         simState.targetPitch = parseFloat(d.head_pitch);
@@ -2627,6 +2662,7 @@
                         statusEl.style.color = 'var(--cyan)';
                     }
                 } catch (e2) {
+                    if (!isLiveDbActive || generation !== slidePollGeneration || slideConnection.connected) return;
                     statusEl.textContent = 'เปิดผ่าน http://localhost/C7 เพื่อเชื่อม DB';
                     statusEl.style.color = 'var(--amber)';
                 }
@@ -2634,6 +2670,7 @@
         }
 
         async function saveCurrentPostureToDb() {
+            if (slideDeviceMode) return;
             const statusEl = document.getElementById('db-status-text');
             const kin = computeKinematics(simState.c7Flexion, simState.headPitch, simState.headRoll, simState.headYaw, 0);
             const payload = {
@@ -2652,7 +2689,8 @@
                     body: JSON.stringify(payload)
                 });
                 const out = await res.json();
-                if (out && out.status === 'ok') {
+                if (!res.ok || !out || out.status !== 'ok' || !(out.csv_saved || out.mysql_saved)) throw new Error(out?.message || 'storage failed');
+                if (out.status === 'ok') {
                     const targetInfo = out.mysql_saved ? 'MySQL+CSV' : 'CSV (MySQL ปิดอยู่)';
                     statusEl.textContent = `✓ บันทึก #${out.id} (${out.cva_angle}°) ลง ${targetInfo}`;
                     statusEl.style.color = 'var(--emerald)';
@@ -2664,136 +2702,65 @@
         }
 
         let lastSlideUsbSaveMs = 0;
-        let activeSlideUsbPort = null;
-        let activeSlideUsbReader = null;
-        let keepSlideUsbReading = false;
-
-        async function readSlideUsbPort(port) {
-            keepSlideUsbReading = false;
-            if (activeSlideUsbReader) {
-                try { await activeSlideUsbReader.cancel(); } catch (e) {}
-                try { activeSlideUsbReader.releaseLock(); } catch (e) {}
-                activeSlideUsbReader = null;
+        let slideDeviceMode = false;
+        let slideDeviceValid = false;
+        let slideDeviceMessage = '';
+        let slideSaveBusy = false;
+        let slidePollGeneration = 0;
+        const slideConnection = new C7Device.SerialConnection({
+            onState({ kind, message }) {
+                const wasValid = slideDeviceValid;
+                slideDeviceValid = kind === 'ready';
+                slideDeviceMessage = message;
+                document.getElementById('db-live-pill').textContent = kind === 'ready' ? 'USB LIVE 5 Hz' : kind.toUpperCase();
+                document.getElementById('db-live-pill').style.color = kind === 'ready' ? 'var(--emerald)' : 'var(--amber)';
+                if (kind !== 'ready' || !wasValid) document.getElementById('db-status-text').textContent = message;
+                document.getElementById('btn-usb-slide').textContent = slideConnection.connected ? '⏹️ ตัด USB' : '🔌 เชื่อม USB (v1)';
+                document.getElementById('simCanvas').style.opacity = slideDeviceMode && !slideDeviceValid ? '0.3' : '1';
+            },
+            onPacket(packet) {
+                simState.targetC7 = simState.c7Flexion = packet.c7_angle;
+                simState.targetPitch = simState.headPitch = packet.head_pitch;
+                simState.targetRoll = simState.headRoll = packet.head_roll;
+                simState.targetYaw = simState.headYaw = packet.head_yaw;
+                syncSlidersFromTarget();
+                if (!slideSaveBusy && Date.now() - lastSlideUsbSaveMs >= 500) {
+                    lastSlideUsbSaveMs = Date.now();
+                    slideSaveBusy = true;
+                    persistSlidePacket(packet).finally(() => { slideSaveBusy = false; });
+                }
             }
-            if (activeSlideUsbPort && activeSlideUsbPort !== port && activeSlideUsbPort.readable) {
-                try { await activeSlideUsbPort.close(); } catch (e) {}
-            }
-            if (!port.readable) {
-                await port.open({ baudRate: 115200 });
-            }
-            try {
-                await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-            } catch (e) {}
-
-            activeSlideUsbPort = port;
-            keepSlideUsbReading = true;
-            if (isLiveDbActive) toggleLiveDbMode(); // ปิด DB Polling ไม่ให้มาทับค่าสดจากสาย USB
-
-            const btn = document.getElementById('btn-usb-slide');
-            const pill = document.getElementById('db-live-pill');
+        });
+        async function persistSlidePacket(packet) {
             const statusEl = document.getElementById('db-status-text');
-            if (btn) {
-                btn.classList.add('active');
-                btn.textContent = '✅ USB เชื่อมต่อแล้ว';
-            }
-            if (pill) {
-                pill.textContent = 'USB DIRECT ●';
-                pill.style.background = 'rgba(0, 240, 255, 0.22)';
-                pill.style.color = 'var(--cyan)';
-            }
-
-            const textDecoder = new TextDecoder('utf-8', { fatal: false });
-            let buffer = '';
-            let consecutiveOpenFailures = 0;
-
-            while (keepSlideUsbReading) {
-                if (!port.readable) {
-                    try { await port.close(); } catch (e) {}
-                    await new Promise(r => setTimeout(r, 200));
-                    if (!keepSlideUsbReading) break;
-                    try {
-                        await port.open({ baudRate: 115200, bufferSize: 8192 });
-                        consecutiveOpenFailures = 0;
-                    } catch (reopenErr) {
-                        consecutiveOpenFailures++;
-                        if (consecutiveOpenFailures > 12) break;
-                        await new Promise(r => setTimeout(r, 300));
-                        continue;
-                    }
-                }
-
-                let reader = null;
-                try {
-                    reader = port.readable.getReader();
-                    activeSlideUsbReader = reader;
-                    while (keepSlideUsbReading) {
-                        const { value, done } = await reader.read();
-                        if (done) break;
-                        if (value) {
-                            consecutiveOpenFailures = 0;
-                            buffer += textDecoder.decode(value, { stream: true });
-                            const lines = buffer.split(/\r?\n/);
-                            buffer = lines.pop();
-                            for (const line of lines) {
-                                const trimmed = line.trim();
-                                const sIdx = trimmed.indexOf('{');
-                                const eIdx = trimmed.lastIndexOf('}');
-                                if (sIdx !== -1 && eIdx > sIdx) {
-                                    try {
-                                        const parsed = JSON.parse(trimmed.substring(sIdx, eIdx + 1));
-                                        if (typeof parsed.c7_angle !== 'undefined') {
-                                            simState.targetC7    = parseFloat(parsed.c7_angle);
-                                            simState.targetPitch = parseFloat(parsed.head_pitch || 0);
-                                            simState.targetRoll  = parseFloat(parsed.head_roll  || 0);
-                                            simState.targetYaw   = parseFloat(parsed.head_yaw   || 0);
-                                            syncSlidersFromTarget();
-
-                                            if (statusEl) {
-                                                statusEl.textContent = `USB Live: C7=${simState.targetC7.toFixed(1)}° | Pitch=${simState.targetPitch.toFixed(1)}° | CVA=${Number(parsed.cva_angle || 52.05).toFixed(1)}°`;
-                                                statusEl.style.color = 'var(--emerald)';
-                                            }
-
-                                            const nowMs = Date.now();
-                                            if (nowMs - lastSlideUsbSaveMs >= 500) {
-                                                lastSlideUsbSaveMs = nowMs;
-                                                fetch('api/save_angle.php', {
-                                                    method: 'POST',
-                                                    headers: { 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify(parsed)
-                                                }).catch(() => {});
-                                            }
-                                        }
-                                    } catch (e) {}
-                                }
-                            }
-                        }
-                    }
-                } catch (streamErr) {
-                    console.warn('Recoverable UART stream event:', streamErr);
-                } finally {
-                    if (reader) {
-                        try { reader.releaseLock(); } catch (e) {}
-                    }
-                    activeSlideUsbReader = null;
-                }
-                await new Promise(r => setTimeout(r, 100));
+            try {
+                const response = await fetch('api/save_angle.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(packet) });
+                const result = await response.json();
+                if (!response.ok || result.status !== 'ok' || !(result.csv_saved || result.mysql_saved)) throw new Error(result.message || 'storage failed');
+                statusEl.textContent = `USB CVA=${packet.cva_angle}° | บันทึก #${result.id} (${result.mysql_saved ? 'MySQL' : 'CSV'})`;
+                statusEl.style.color = 'var(--emerald)';
+            } catch (error) {
+                statusEl.textContent = 'รับ USB ได้ แต่บันทึกไม่สำเร็จ: ' + error.message;
+                statusEl.style.color = 'var(--amber)';
             }
         }
-
+        async function zeroSlideDevice() {
+            try { await slideConnection.zero(); }
+            catch (error) { document.getElementById('db-status-text').textContent = error.message; }
+        }
+        async function readSlideUsbPort(port) {
+            if (isLiveDbActive) toggleLiveDbMode();
+            ++slidePollGeneration;
+            slideDeviceMode = true;
+            simState.targetDriftDeg = simState.injectedDriftDeg = 0;
+            simState.jawNoiseTimer = 0;
+            await slideConnection.connect(port);
+        }
         async function connectUsbSerialFromSlide() {
-            if (!('serial' in navigator)) {
-                alert('เบราว์เซอร์นี้ไม่รองรับ Web Serial API\nกรุณาเปิดหน้านี้ด้วย Google Chrome หรือ Microsoft Edge ครับ');
-                return;
-            }
-            try {
-                const port = await navigator.serial.requestPort();
-                await readSlideUsbPort(port);
-            } catch (err) {
-                console.warn('USB Serial error:', err);
-                if (err && err.name !== 'NotFoundError') {
-                    alert('⚠️ ไม่สามารถเปิดพอร์ต USB ได้!\n\nสาเหตุหลัก: หน้าต่าง Serial Monitor ในโปรแกรม Arduino IDE ยังเปิดค้างอยู่\n👉 กรุณาปิด Serial Monitor ใน Arduino IDE ก่อน แล้วกดปุ่มเชื่อมต่อนี้อีกครั้งครับ');
-                }
-            }
+            if (slideConnection.connected) { await slideConnection.disconnect(); return; }
+            if (!('serial' in navigator)) { alert('กรุณาใช้ Chrome หรือ Edge ที่รองรับ Web Serial'); return; }
+            try { await readSlideUsbPort(await navigator.serial.requestPort()); }
+            catch (error) { document.getElementById('db-status-text').textContent = 'เชื่อมต่อไม่สำเร็จ: ' + error.message; }
         }
 
         window.addEventListener('DOMContentLoaded', () => {

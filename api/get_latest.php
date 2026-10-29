@@ -16,9 +16,10 @@ header('Access-Control-Allow-Origin: *');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
 date_default_timezone_set('Asia/Bangkok');
+require_once __DIR__ . '/config.php';
 
-$latestFile = __DIR__ . '/latest_angle.json';
-$csvFile    = __DIR__ . '/posture_logs.csv';
+$latestFile = c7DataPath('latest_angle.json');
+$csvFile    = c7DataPath('posture_logs.csv');
 
 $mysqlConnected = false;
 $row = null;
@@ -27,36 +28,31 @@ $totalRows = 0;
 
 // 1. Try reading latest row & recent 15 rows from MySQL `c7_posture_db`.`posture_logs`
 try {
-    $xamppSock = '/Applications/XAMPP/xamppfiles/var/mysql/mysql.sock';
-    $dsnDb = file_exists($xamppSock)
-        ? "mysql:unix_socket={$xamppSock};dbname=c7_posture_db;charset=utf8mb4"
-        : 'mysql:host=127.0.0.1;port=3306;dbname=c7_posture_db;charset=utf8mb4';
-    $pdo = new PDO($dsnDb, 'root', '', [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_TIMEOUT => 1
-    ]);
-    $mysqlConnected = true;
+    $pdo = c7Database();
+    if ($pdo !== null) {
+        $mysqlConnected = true;
 
-    $stmt = $pdo->query("SELECT id, c7_angle, head_pitch, head_roll, head_yaw, cva_angle, created_at FROM posture_logs ORDER BY id DESC LIMIT 15");
-    $dbRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($dbRows as $r) {
-        $item = [
-            'id'         => (int)$r['id'],
-            'c7_angle'   => (float)$r['c7_angle'],
-            'head_pitch' => (float)$r['head_pitch'],
-            'head_roll'  => (float)$r['head_roll'],
-            'head_yaw'   => (float)$r['head_yaw'],
-            'cva_angle'  => (float)$r['cva_angle'],
-            'created_at' => $r['created_at']
-        ];
-        $history[] = $item;
-    }
-    if (count($history) > 0) {
-        $row = $history[0];
-    }
+        $stmt = $pdo->query("SELECT id, c7_angle, head_pitch, head_roll, head_yaw, cva_angle, created_at FROM posture_logs ORDER BY id DESC LIMIT 15");
+        $dbRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($dbRows as $r) {
+            $item = [
+                'id'         => (int)$r['id'],
+                'c7_angle'   => (float)$r['c7_angle'],
+                'head_pitch' => (float)$r['head_pitch'],
+                'head_roll'  => (float)$r['head_roll'],
+                'head_yaw'   => (float)$r['head_yaw'],
+                'cva_angle'  => (float)$r['cva_angle'],
+                'created_at' => $r['created_at']
+            ];
+            $history[] = $item;
+        }
+        if (count($history) > 0) {
+            $row = $history[0];
+        }
 
-    $countStmt = $pdo->query("SELECT COUNT(*) FROM posture_logs");
-    $totalRows = (int)$countStmt->fetchColumn();
+        $countStmt = $pdo->query("SELECT COUNT(*) FROM posture_logs");
+        $totalRows = (int)$countStmt->fetchColumn();
+    }
 } catch (Throwable $e) {
     $mysqlConnected = false;
 }
